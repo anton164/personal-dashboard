@@ -55,7 +55,7 @@ def sync_data_for_date(
     activity_data = oura_client.activity_df(
         date.strftime('%Y-%m-%d')
     )
-    st.write(activity_data)
+    # st.write(activity_data)
 
     try:
         sleep_data = sleep_data.loc[date]
@@ -127,6 +127,13 @@ def sync_data_for_date(
         ))
         st.write("Page created")
 
+def get_metrics(df_notion):
+    return {
+        "avg_steps": int(df_notion[[COL_NAMES["activity_steps"]]].mean().round(0)),
+        "avg_sleep_hrs": float(df_notion[[COL_NAMES["sleep_hrs"]]].mean().round(2)),
+        "count_fasting_days": int(sum(pd.to_numeric(df_notion[COL_NAMES["fasting_hrs"]].fillna(0)) > 0)),
+    }
+
 @db.apps.streamlit("/app", name="Dashboard")
 def dashboard():
     st.header("Anton's Data")
@@ -145,17 +152,37 @@ def dashboard():
     ]:
         notion_df[col] = np.floor(notion_df[col]).astype("Int64")
     
+    selected_week = pd.to_datetime(datetime.now()).week
+    notion_df["week_number"] = notion_df.index.map(lambda x: x.week)
+
+    df_selected_period = notion_df[
+        notion_df["week_number"] == selected_week
+    ]
+    df_prev_period = notion_df[
+        notion_df["week_number"] == selected_week - 1
+    ]
+    notion_tab.subheader("This Week")
     col1, col2 = notion_tab.columns(2)
+    selected_period_metrics = get_metrics(df_selected_period)
+    prev_period_metrics = get_metrics(df_prev_period)
+    st.write(prev_period_metrics)
     col1.metric(
         "Average steps per day",
-        notion_df[[COL_NAMES["activity_steps"]]].mean().round(0),
+        selected_period_metrics["avg_steps"],
+        delta=selected_period_metrics["avg_steps"] - prev_period_metrics["avg_steps"]
     )
     col2.metric(
         "Average hours of sleep per day",
-        notion_df[[COL_NAMES["sleep_hrs"]]].mean().round(2),
+        selected_period_metrics["avg_sleep_hrs"],
+        delta=round(selected_period_metrics["avg_sleep_hrs"] - prev_period_metrics["avg_sleep_hrs"], 2)
+    )
+    col1.metric(
+        "Days of fasting",
+        selected_period_metrics["count_fasting_days"],
+        delta=selected_period_metrics["count_fasting_days"] - prev_period_metrics["count_fasting_days"]
     )
     notion_tab.dataframe(
-        notion_df[[
+        df_selected_period[[
             COL_NAMES["fasting_hrs"],
             COL_NAMES["sleep_hrs"],
             COL_NAMES["activity_steps"],
@@ -193,13 +220,23 @@ def sync_debugger():
         "Sync date",
         value=datetime.now()
     )
-    if st.button("Sync with Notion"):
+    if st.button("Sync data for day"):
         sync_data_for_date(
             notion,
             db_id,
             oura_client,
             sync_date
         )
+    if st.button("Sync data for week"):
+        start_of_week = sync_date  - timedelta(days=sync_date.weekday() % 7)
+        for i in range(7):
+            sync_data_for_date(
+                notion,
+                db_id,
+                oura_client,
+                start_of_week + timedelta(days=i)
+            )
+        
 
 @db.jobs.repeat_every(seconds=6 * 60 * 60)
 def sync_data_for_today():
