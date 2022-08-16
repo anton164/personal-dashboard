@@ -17,7 +17,8 @@ COL_NAMES = {
     "sleep_hrs": "😴 Sleep time (hrs)",
     "activity_cals": "🔥 Cals",
     "activity_steps":  "🏃 Steps",
-    "french": "🇫🇷 French",
+    # "french": "🇫🇷 French",
+    "spanish": "🇪🇸 Spanish",
     "piano": "🎹 Piano"
 }
 
@@ -129,8 +130,8 @@ def sync_data_for_date(
 
 def get_metrics(df_notion):
     return {
-        "avg_steps": int(df_notion[[COL_NAMES["activity_steps"]]].mean().round(0)),
-        "avg_sleep_hrs": float(df_notion[[COL_NAMES["sleep_hrs"]]].mean().round(2)),
+        "avg_steps": int(df_notion[[COL_NAMES["activity_steps"]]].fillna(0).mean().round(0)),
+        "avg_sleep_hrs": float(df_notion[[COL_NAMES["sleep_hrs"]]].dropna().mean().round(2)),
         "count_fasting_days": int(sum(pd.to_numeric(df_notion[COL_NAMES["fasting_hrs"]].fillna(0)) > 0)),
     }
 
@@ -154,7 +155,10 @@ def dashboard():
     
     selected_week = pd.to_datetime(datetime.now()).week
     notion_df["week_number"] = notion_df.index.map(lambda x: x.week)
-
+    # st.write(notion_df)
+    #for a, b in reversed(list(notion_df.groupby(pd.Grouper(freq='7D', sort=True)))):
+    #    st.write(a)
+    #    st.write(b)
     df_selected_period = notion_df[
         notion_df["week_number"] == selected_week
     ]
@@ -165,7 +169,7 @@ def dashboard():
     col1, col2 = notion_tab.columns(2)
     selected_period_metrics = get_metrics(df_selected_period)
     prev_period_metrics = get_metrics(df_prev_period)
-    st.write(prev_period_metrics)
+    # st.write(prev_period_metrics)
     col1.metric(
         "Average steps per day",
         selected_period_metrics["avg_steps"],
@@ -187,7 +191,7 @@ def dashboard():
             COL_NAMES["sleep_hrs"],
             COL_NAMES["activity_steps"],
             COL_NAMES["activity_cals"],
-            COL_NAMES["french"],
+            COL_NAMES["spanish"],
             COL_NAMES["piano"]
         ]],
         width=1000
@@ -239,13 +243,21 @@ def sync_debugger():
         
 
 @db.jobs.repeat_every(seconds=6 * 60 * 60)
-def sync_data_for_today():
+def sync_data():
     oura_client = get_oura_client()
     notion = get_notion_client()
     db_id = get_id(APP_CONFIG["NOTION_DATABASE_PAGE"])
+    # sync today
     sync_data_for_date(
         notion,
         db_id,
         oura_client,
         datetime.now().date()
+    )
+    # sync yesterday
+    sync_data_for_date(
+        notion,
+        db_id,
+        oura_client,
+        datetime.now().date() - timedelta(days=1) 
     )
