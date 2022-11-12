@@ -1,3 +1,4 @@
 oura
 notion-client
 notion-df
+streamlit
