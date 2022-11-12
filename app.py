@@ -2,8 +2,6 @@ import streamlit as st
 from ui_dashboard import render_dashboard
 from ui_sync_debugger import render_sync_debugger
 
-if 'count' not in st.session_state:
-    st.session_state.count = 0
 
 def render():
     pages = {
