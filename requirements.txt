@@ -1,4 +1,3 @@
-databutton
 oura
 notion-client
 notion-df

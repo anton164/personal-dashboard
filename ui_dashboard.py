@@ -1,24 +1,12 @@
-import databutton as db
 import streamlit as st
-from config import APP_CONFIG
-from oura import OuraClientDataFrame
-from notion_client import Client as NotionClient
+from config import APP_CONFIG, COL_NAMES
 from datetime import datetime, timedelta, date
-from notion_client.helpers import get_id
 import pandas as pd
 import numpy as np
 import notion_df
-from sync_utils import sync_daily_data
+from api_utils import get_notion_client, get_oura_client
+
 notion_df.pandas()
-
-# st.set_page_config(layout="wide")
-
-def get_oura_client():
-    return OuraClientDataFrame(personal_access_token=APP_CONFIG["OURA_TOKEN"])
-
-def get_notion_client():
-    return NotionClient(auth=APP_CONFIG["NOTION_TOKEN"])
-
 
 def get_metrics(df_notion):
     return {
@@ -28,8 +16,8 @@ def get_metrics(df_notion):
         "count_fasting_days": int(sum(pd.to_numeric(df_notion[COL_NAMES["fasting_hrs"]].fillna(0)) > 0)),
     }
 
-@db.apps.streamlit("/app", name="Dashboard")
-def dashboard():
+
+if __name__ == "__main__":
     st.header("Anton's Data")
     oura_client = get_oura_client()
     st.write(oura_client.user_info())
@@ -115,37 +103,3 @@ def dashboard():
         str(start_date)
     )
     oura_tab.write(sleep_df)
-
-@db.apps.streamlit("/sync_debugger", name="Sync Debugger")
-def sync_debugger():
-    oura_client = get_oura_client()
-    notion = get_notion_client()
-    db_id = get_id(APP_CONFIG["NOTION_DATABASE_PAGE"])
-    notion_db = notion.databases.retrieve(db_id)
-    
-    st.header("Sync with notion")
-    sync_date = st.date_input(
-        "Sync date",
-        value=datetime.now()
-    )
-    if st.button("Sync data for day"):
-        sync_data_for_date(
-            notion,
-            db_id,
-            oura_client,
-            sync_date
-        )
-    if st.button("Sync data for week"):
-        start_of_week = sync_date  - timedelta(days=sync_date.weekday() % 7)
-        for i in range(7):
-            sync_data_for_date(
-                notion,
-                db_id,
-                oura_client,
-                start_of_week + timedelta(days=i)
-            )
-        
-
-@db.jobs.repeat_every(seconds=4 * 60 * 60)
-def sync_data():
-    sync_daily_data()

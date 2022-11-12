@@ -11,15 +11,6 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
-        },
-        {
-            "name": "Debug Databutton",
-            "type": "python",
-            "request": "launch",
-            "program": "/usr/local/anaconda3/envs/personal-dashboard/bin/databutton",
-            "args": [
-                "start"
-            ]
         }
     ]
 }
