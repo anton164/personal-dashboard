@@ -1,12 +1,12 @@
 import streamlit as st
-from api_utils import get_notion_client
+from api_utils import get_notion_client, get_oura_client
 from datetime import datetime, timedelta
 from sync_utils import sync_data_for_date
 from notion_client.helpers import get_id
 from config import APP_CONFIG
 
-if __name__ == "__main__":
-    oura_client =  ()
+def render_sync_debugger():
+    oura_client = get_oura_client()
     notion = get_notion_client()
     db_id = get_id(APP_CONFIG["NOTION_DATABASE_PAGE"])
     notion_db = notion.databases.retrieve(db_id)
@@ -32,3 +32,6 @@ if __name__ == "__main__":
                 oura_client,
                 start_of_week + timedelta(days=i)
             )
+
+if __name__ == "__main__":
+    render_sync_debugger()

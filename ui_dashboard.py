@@ -17,7 +17,7 @@ def get_metrics(df_notion):
     }
 
 
-if __name__ == "__main__":
+def render_dashboard():
     st.header("Anton's Data")
     oura_client = get_oura_client()
     st.write(oura_client.user_info())
@@ -103,3 +103,6 @@ if __name__ == "__main__":
         str(start_date)
     )
     oura_tab.write(sleep_df)
+
+if __name__ == "__main__":
+    render_dashboard()
