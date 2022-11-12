@@ -2,26 +2,16 @@ import databutton as db
 import streamlit as st
 from config import APP_CONFIG
 from oura import OuraClientDataFrame
-from datetime import datetime, timedelta, date
 from notion_client import Client as NotionClient
+from datetime import datetime, timedelta, date
 from notion_client.helpers import get_id
 import pandas as pd
 import numpy as np
 import notion_df
+from sync_utils import sync_daily_data
 notion_df.pandas()
 
 # st.set_page_config(layout="wide")
-
-COL_NAMES = {
-    "fasting_hrs": "🍔 Fasting (hrs)",
-    "sleep_hrs": "😴 Sleep time (hrs)",
-    "activity_cals": "🔥 Cals",
-    "activity_steps":  "🏃 Steps",
-    # "french": "🇫🇷 French",
-    "spanish": "🇪🇸 Spanish",
-    "piano": "🎹 Piano",
-    "weight": "Weight (kg)"
-}
 
 def get_oura_client():
     return OuraClientDataFrame(personal_access_token=APP_CONFIG["OURA_TOKEN"])
@@ -29,105 +19,6 @@ def get_oura_client():
 def get_notion_client():
     return NotionClient(auth=APP_CONFIG["NOTION_TOKEN"])
 
-def date_to_page_name(date: datetime):
-    return f"{date.strftime('%A')} ({date.strftime('%Y-%m-%d')})"
-
-
-def find_notion_page_by_name(notion, name: str):
-    query_results = notion.search(query=name)
-    if len(query_results["results"]) == 0:
-        return False
-    else:
-        for result in query_results["results"]:
-            if result["properties"]["Name"]["title"][0]["plain_text"] == name:
-                return result
-    return False
-
-
-def sync_data_for_date(
-    notion: NotionClient, 
-    db_id: str,
-    oura_client: OuraClientDataFrame,
-    date: date
-):
-    # Get data from Oura
-    sleep_data = oura_client.sleep_df(
-        date.strftime('%Y-%m-%d')
-    )
-    activity_data = oura_client.activity_df(
-        date.strftime('%Y-%m-%d')
-    )
-    # st.write(activity_data)
-
-    try:
-        sleep_data = sleep_data.loc[date]
-        sleep_hours = round(sleep_data["total_in_hrs"], 2)
-    except:
-        st.write(f"Missing sleep data for {date}")
-        sleep_hours = None
-    
-    try:
-        activity_data = activity_data.loc[date]
-        activity_steps = int(activity_data["steps"])
-        activity_cals = int(activity_data["cal_total"])
-    except:
-        st.write(f"Missing activity data for {date}")
-        activity_steps = None
-        activity_cals = None
-    
-    # Get or create page in Notion
-    page_name = date_to_page_name(date)
-    st.write("Syncing...", page_name)
-    existing_page = find_notion_page_by_name(notion, page_name)
-    if existing_page:
-        st.write("Page exists, updating!")
-        notion.pages.update(
-            existing_page["id"],
-            properties={
-                COL_NAMES["sleep_hrs"]: {
-                    "number": sleep_hours
-                },
-                COL_NAMES["activity_steps"]: {
-                    "number": activity_steps
-                },
-                COL_NAMES["activity_cals"]: {
-                    "number": activity_cals
-                }
-            }
-        )
-        st.write("Page updated!")
-    else:
-        st.write(notion.pages.create(parent={
-                "type": "database_id",
-                "database_id": db_id
-            },
-            properties={
-               "Name": {
-                    "title": [
-                        {
-                            "text": {
-                                "content": page_name
-                            }
-                        }
-                    ]
-                },
-                "Date": {
-                    "date": {
-                        "start": date.isoformat()
-                    }
-                },
-                COL_NAMES["sleep_hrs"]: {
-                    "number": sleep_hours
-                },
-               COL_NAMES["activity_steps"]: {
-                    "number": activity_steps
-                },
-                COL_NAMES["activity_cals"]: {
-                    "number": activity_cals
-                }
-            }
-        ))
-        st.write("Page created")
 
 def get_metrics(df_notion):
     return {
@@ -257,20 +148,4 @@ def sync_debugger():
 
 @db.jobs.repeat_every(seconds=4 * 60 * 60)
 def sync_data():
-    oura_client = get_oura_client()
-    notion = get_notion_client()
-    db_id = get_id(APP_CONFIG["NOTION_DATABASE_PAGE"])
-    # sync today
-    sync_data_for_date(
-        notion,
-        db_id,
-        oura_client,
-        datetime.now().date()
-    )
-    # sync yesterday
-    sync_data_for_date(
-        notion,
-        db_id,
-        oura_client,
-        datetime.now().date() - timedelta(days=1) 
-    )
+    sync_daily_data()
